@@ -1,0 +1,109 @@
+---
+title: "Practical Machine Learning Course Project"
+output: html_document
+
+---
+
+##1 Introduction
+
+The purpose of this project is to develop a means of classify if a population is performing a certain excerise correctly by analysing secific movements. 
+
+We will use data describiong these movements provided by new technology such as Jawbone Up, Fitbit and Nike Fuelband. These inexpensive pieces of equipment are designed to collect large amounts of data about personal activity to encourage users to become more active. 
+
+Each particpant was asked to perform barbell lifts correctly and incorrectly in 5 different ways. Each incorrect technique was given a class (A - E) and stored under the field name "classe". We will look to classify future particpants "classe" by performing statistical learning techniques on the dataset provided and developing a classification model.
+
+## 2 Load necessary packages and the Dataset
+
+```{r}
+library(caret)
+library(ggplot2)
+library(knitr)
+library(corrplot)
+library(dplyr)
+```
+
+There is a testing and a training dataset provided in the project. We will use the training dataset to develop our model and then use the testing dataset as a measure of our accuracy.
+
+```{r}
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+dim(training)
+
+```
+
+
+## 3 Clean and Break Data
+
+We begin by splitting the training dataset further into testing and training datasets.
+
+```{r}
+inTrain <- training$classe %>% createDataPartition(p=0.7,list=FALSE)
+trainingSet <- training[inTrain,]
+testSet <- training[-inTrain,]
+dim(trainingSet)
+```
+
+There are a number of fields that contain values that will not be usefull in our final model. We will use the R function "nearZeroVar" to find all of the fields that contain values with low variance and therefore reduced ability to inform prediction models.    
+
+```{r}
+nzv <- nearZeroVar(trainingSet)
+trainingSet <- trainingSet[,-nzv]
+testSet <- testSet[,-nzv]
+dim(trainingSet)
+```
+
+We wil also remove all of the fields that contain only "NA" for reasons similar towhy we removed values with low variance. From inspection of the dataset we will also remove the first 5 fields. They contain ID and logistical data that will not be relevant to our final prediction model.
+
+
+```{r}
+cleantrainingSet <- trainingSet[, names(trainingSet)[sapply(trainingSet, function(x) !any(is.na(x)))>0.95]]
+CleantestSet <- testSet[, names(testSet)[sapply(testSet, function(x) !any(is.na(x)))>0.95]]
+
+cleantrainingSet <- cleantrainingSet[,-c(1:5)]
+CleantestSet <- CleantestSet[,-c(1:5)]
+dim(cleantrainingSet)
+```
+
+##4 Identify Correlations
+
+
+We use the cor() and corrplot() functions to plot a matrix of the data. This will help identify any specific correlations within the dataset using the very
+
+```{r }
+corPlot<- cor(cleantrainingSet[,-54])
+corrplot(corPlot,method = "ellipse",type="lower",order="FPC",tl.cex=0.65)
+```
+
+
+##5 Prediction Random Forest
+
+We then develop a model fit using random forset method on the clean training dataset.
+We use cross validation with 5 folds to give a better estimate of the training error. 
+
+```{r}
+set.seed(1432)
+control <- trainControl(method="cv",number=5,verboseIter = FALSE)
+modFit <- train(classe~.,data=cleantrainingSet,method="rf",trainControl=control)
+modFit$finalModel
+```
+
+Now we predict on the test dataset that was partitioned from the initial training set.
+
+
+```{r }
+prediction <- predict(modFit, CleantestSet )
+confusionMatrix(prediction,CleantestSet$classe)
+```
+
+Our accuracy rate of 99.75% with very high sensitivity and specificity rates.
+
+##6 Prediction on Test Data Set
+
+We finally use our prediction model on the Testing data set to predict which the activity class of each participant's exercise. 
+
+```{r}
+predictTest <- predict(modFit, testing)
+predictTest
+```
+
+
